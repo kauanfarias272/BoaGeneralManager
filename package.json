@@ -1,5 +1,5 @@
 {
-  "name": "boa-general-manager",
+  "name": "constrictor",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "@supabase/supabase-js": "^2.103.0",
     "lucide-react": "^0.546.0",
     "react": "^19.0.0",

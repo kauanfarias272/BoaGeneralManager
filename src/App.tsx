@@ -113,9 +113,9 @@ function SetupScreen({ onConnect }: { onConnect: (client: SupabaseClient, key: s
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
           <div className="w-20 h-20 bg-[#d0d0a0] rounded-3xl flex items-center justify-center mb-4 shadow-2xl">
-            <span className="text-[#0a0a0a] font-black text-4xl">B</span>
+            <span className="text-[#0a0a0a] font-black text-4xl">C</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Boa General Manager</h1>
+          <h1 className="text-2xl font-bold text-white">Constrictor</h1>
           <p className="text-gray-500 text-sm mt-1">Painel administrativo privado</p>
         </div>
 
@@ -243,7 +243,7 @@ function Dashboard({ users, subscriptions, onSelectUser }: {
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `boawallet-users-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `constrictor-users-${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
   };
 
@@ -638,10 +638,10 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-[#d0d0a0] rounded-xl flex items-center justify-center">
-              <span className="text-[#0a0a0a] font-black text-lg">B</span>
+              <span className="text-[#0a0a0a] font-black text-lg">C</span>
             </div>
             <div>
-              <span className="font-bold text-sm text-white">Boa General Manager</span>
+              <span className="font-bold text-sm text-white">Constrictor</span>
               <span className="ml-2 text-[10px] text-gray-600 bg-gray-800 px-2 py-0.5 rounded-full">admin</span>
             </div>
           </div>
