@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
+import { createClient, User } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 import {
   Users, Package, DollarSign, TrendingUp, Search, ChevronRight,
   ArrowLeft, RefreshCw, LogOut, Shield, AlertCircle,
-  Calendar, Tag, CreditCard, Globe, BarChart3, Download, Chrome
+  Calendar, Tag, CreditCard, Globe, BarChart3, Download
 } from 'lucide-react';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -11,12 +13,15 @@ import {
 const SUPABASE_URL = 'https://xrnfgdyqkqqpxjwpmkta.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_kX5vf6Ocj3b7PljEywobMg_UL_MECHd';
 const ADMIN_EMAIL = 'kauanfarias272@gmail.com';
+const DEEP_LINK = 'io.constrictor.app://auth';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
+    flowType: 'pkce',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false,
+    storageKey: 'constrictor_auth_v1',
   }
 });
 
@@ -73,23 +78,61 @@ const monthlyAmount = (sub: Subscription) => {
   }
 };
 
+// ── Snake Logo SVG ────────────────────────────────────────────────────────────
+
+function SnakeLogo({ size = 40, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      {/* Body coil */}
+      <path
+        d="M 50 85 C 25 85 15 70 15 58 C 15 46 25 38 38 38 C 51 38 60 46 60 56 C 60 64 54 70 46 70 C 38 70 33 65 33 58 C 33 52 37 48 42 48"
+        stroke="#0a0a0a" strokeWidth="9" strokeLinecap="round" fill="none"
+      />
+      {/* Head */}
+      <ellipse cx="62" cy="30" rx="14" ry="11" fill="#0a0a0a" />
+      {/* Eye */}
+      <circle cx="67" cy="26" r="3" fill="#d0d0a0" />
+      <circle cx="68" cy="25" r="1.2" fill="#0a0a0a" />
+      {/* Tongue */}
+      <path d="M 72 33 L 80 38 M 72 33 L 80 30" stroke="#0a0a0a" strokeWidth="2" strokeLinecap="round" />
+      {/* Tail tip */}
+      <path d="M 42 48 C 46 44 52 43 55 46" stroke="#0a0a0a" strokeWidth="7" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
 // ── Login Screen ──────────────────────────────────────────────────────────────
 
-function LoginScreen({ onLogin }: { onLogin: () => void }) {
+function LoginScreen() {
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('');
   const [error, setError] = useState('');
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) throw error;
+      if (Capacitor.isNativePlatform()) {
+        setStatus('Abrindo navegador para login...');
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: DEEP_LINK,
+            skipBrowserRedirect: false,
+          },
+        });
+        if (error) throw error;
+        setStatus('Complete o login no navegador e volte ao app.');
+      } else {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.origin },
+        });
+        if (error) throw error;
+      }
     } catch (e: any) {
       setError(e.message);
+      setStatus('');
       setLoading(false);
     }
   };
@@ -98,8 +141,8 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-10">
-          <div className="w-20 h-20 bg-[#d0d0a0] rounded-3xl flex items-center justify-center mb-4 shadow-2xl">
-            <span className="text-[#0a0a0a] font-black text-4xl">C</span>
+          <div className="w-24 h-24 bg-[#d0d0a0] rounded-3xl flex items-center justify-center mb-4 shadow-2xl">
+            <SnakeLogo size={64} />
           </div>
           <h1 className="text-2xl font-bold text-white">Constrictor</h1>
           <p className="text-gray-500 text-sm mt-1">Painel administrativo privado</p>
@@ -112,8 +155,15 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
           </div>
 
           <p className="text-gray-400 text-sm leading-relaxed">
-            Entre com sua conta Google (<span className="text-[#d0d0a0] font-mono text-xs">{ADMIN_EMAIL}</span>) para acessar todos os dados.
+            Entre com <span className="text-[#d0d0a0] font-mono text-xs">{ADMIN_EMAIL}</span> para ver todos os dados do BoaWallet.
           </p>
+
+          {status && (
+            <div className="text-sm text-[#d0d0a0] bg-[#d0d0a0]/10 border border-[#d0d0a0]/20 rounded-xl px-4 py-3 flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full border-2 border-[#d0d0a0]/40 border-t-[#d0d0a0] animate-spin shrink-0" />
+              {status}
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/20 border border-red-900/40 rounded-xl px-4 py-3">
@@ -125,10 +175,14 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full py-3.5 bg-[#d0d0a0] text-[#0a0a0a] font-bold rounded-xl hover:bg-[#e0e0b0] transition-colors disabled:opacity-50 flex items-center justify-center gap-3"
+            className="w-full py-3.5 bg-[#d0d0a0] text-[#0a0a0a] font-bold rounded-xl hover:bg-[#e0e0b0] transition-colors disabled:opacity-60 flex items-center justify-center gap-3 text-sm"
           >
-            <Chrome size={20} />
-            {loading ? 'Abrindo Google...' : 'Entrar com Google'}
+            {loading ? (
+              <div className="w-4 h-4 rounded-full border-2 border-[#0a0a0a]/30 border-t-[#0a0a0a] animate-spin" />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            )}
+            {loading ? 'Aguarde...' : 'Entrar com Google'}
           </button>
         </div>
       </div>
@@ -161,26 +215,18 @@ function Dashboard({ users, subscriptions, onSelectUser }: {
   const [search, setSearch] = useState('');
 
   const activeSubs = subscriptions.filter(s => !s.status?.startsWith('cancelled'));
-  const totalMonthlyBRL = activeSubs
-    .filter(s => s.costCurrency === 'BRL')
-    .reduce((acc, s) => acc + monthlyAmount(s), 0);
-
-  const categoryCount = activeSubs.reduce((acc, s) => {
-    acc[s.category] = (acc[s.category] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const totalMonthlyBRL = activeSubs.filter(s => s.costCurrency === 'BRL').reduce((acc, s) => acc + monthlyAmount(s), 0);
+  const categoryCount = activeSubs.reduce((acc, s) => { acc[s.category] = (acc[s.category] || 0) + 1; return acc; }, {} as Record<string, number>);
   const topCategories = Object.entries(categoryCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   const enrichedUsers = users.map(u => {
-    const userSubs = subscriptions.filter(s => s.user_id === u.id);
-    const userActive = userSubs.filter(s => !s.status?.startsWith('cancelled'));
+    const uSubs = subscriptions.filter(s => s.user_id === u.id);
+    const uActive = uSubs.filter(s => !s.status?.startsWith('cancelled'));
     return {
       ...u,
-      sub_count: userSubs.length,
-      active_count: userActive.length,
-      total_monthly: userActive
-        .filter(s => s.costCurrency === 'BRL')
-        .reduce((acc, s) => acc + monthlyAmount(s), 0),
+      sub_count: uSubs.length,
+      active_count: uActive.length,
+      total_monthly: uActive.filter(s => s.costCurrency === 'BRL').reduce((acc, s) => acc + monthlyAmount(s), 0),
     };
   });
 
@@ -192,17 +238,10 @@ function Dashboard({ users, subscriptions, onSelectUser }: {
   const exportCSV = () => {
     const rows = [
       ['ID', 'Nome', 'Email', 'Idioma', 'Moeda Base', 'Total Itens', 'Itens Ativos', 'Gasto Mensal BRL', 'Última Atividade'],
-      ...enrichedUsers.map(u => [
-        u.id, u.name || '', u.email || '', u.language || '', u.base_currency || '',
-        String(u.sub_count), String(u.active_count),
-        String(u.total_monthly.toFixed(2)), u.updated_at || ''
-      ])
+      ...enrichedUsers.map(u => [u.id, u.name || '', u.email || '', u.language || '', u.base_currency || '', String(u.sub_count), String(u.active_count), String(u.total_monthly.toFixed(2)), u.updated_at || ''])
     ];
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `constrictor-users-${new Date().toISOString().slice(0, 10)}.csv`;
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `constrictor-${new Date().toISOString().slice(0, 10)}.csv` });
     a.click();
   };
 
@@ -211,23 +250,18 @@ function Dashboard({ users, subscriptions, onSelectUser }: {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<Users size={18} />} label="Usuários" value={String(users.length)} sub="contas registradas" />
         <StatCard icon={<Package size={18} />} label="Total Itens" value={String(subscriptions.length)} sub={`${activeSubs.length} ativos`} />
-        <StatCard icon={<DollarSign size={18} />} label="Gasto/mês (BRL)" value={`R$ ${totalMonthlyBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="itens BRL ativos" />
+        <StatCard icon={<DollarSign size={18} />} label="Gasto/mês BRL" value={`R$ ${totalMonthlyBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="itens BRL ativos" />
         <StatCard icon={<TrendingUp size={18} />} label="Média/usuário" value={users.length ? String(Math.round(subscriptions.length / users.length)) : '0'} sub="itens por conta" />
       </div>
 
       {topCategories.length > 0 && (
         <div className="bg-[#111] border border-gray-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 size={16} className="text-[#d0d0a0]" />
-            <span className="text-sm font-semibold">Top Categorias</span>
-          </div>
+          <div className="flex items-center gap-2 mb-4"><BarChart3 size={16} className="text-[#d0d0a0]" /><span className="text-sm font-semibold">Top Categorias</span></div>
           <div className="space-y-3">
             {topCategories.map(([cat, count]) => (
               <div key={cat} className="flex items-center gap-3">
                 <span className="text-xs text-gray-400 w-28 truncate">{cat}</span>
-                <div className="flex-1 bg-gray-800 rounded-full h-1.5">
-                  <div className="bg-[#d0d0a0] h-1.5 rounded-full" style={{ width: `${(count / activeSubs.length) * 100}%` }} />
-                </div>
+                <div className="flex-1 bg-gray-800 rounded-full h-1.5"><div className="bg-[#d0d0a0] h-1.5 rounded-full" style={{ width: `${(count / activeSubs.length) * 100}%` }} /></div>
                 <span className="text-xs text-gray-400 w-8 text-right">{count}</span>
               </div>
             ))}
@@ -245,19 +279,11 @@ function Dashboard({ users, subscriptions, onSelectUser }: {
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar usuário..."
-                className="bg-[#1a1a1a] border border-gray-700 rounded-xl pl-8 pr-4 py-2 text-xs text-white placeholder-gray-600 focus:outline-none w-44"
-              />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." className="bg-[#1a1a1a] border border-gray-700 rounded-xl pl-8 pr-4 py-2 text-xs text-white placeholder-gray-600 focus:outline-none w-40" />
             </div>
-            <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 bg-[#1a1a1a] border border-gray-700 rounded-xl text-xs text-gray-400 hover:text-white transition-colors">
-              <Download size={13} /> CSV
-            </button>
+            <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 bg-[#1a1a1a] border border-gray-700 rounded-xl text-xs text-gray-400 hover:text-white transition-colors"><Download size={13} /> CSV</button>
           </div>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -275,24 +301,18 @@ function Dashboard({ users, subscriptions, onSelectUser }: {
                 <tr key={u.id} onClick={() => onSelectUser(u)} className={`cursor-pointer hover:bg-[#1a1a1a] transition-colors ${i < filtered.length - 1 ? 'border-b border-gray-800/30' : ''}`}>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#d0d0a0]/20 border border-[#d0d0a0]/30 flex items-center justify-center text-xs font-bold text-[#d0d0a0] shrink-0">
-                        {(u.name || u.email || 'U').charAt(0).toUpperCase()}
-                      </div>
+                      <div className="w-8 h-8 rounded-full bg-[#d0d0a0]/20 border border-[#d0d0a0]/30 flex items-center justify-center text-xs font-bold text-[#d0d0a0] shrink-0">{(u.name || u.email || 'U').charAt(0).toUpperCase()}</div>
                       <span className="font-medium text-white text-sm truncate max-w-[120px]">{u.name || '—'}</span>
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-gray-400 text-xs font-mono hidden sm:table-cell">{u.email || '—'}</td>
                   <td className="px-4 py-3.5 text-center text-gray-300">{u.sub_count}</td>
                   <td className="px-4 py-3.5 text-center text-emerald-400">{u.active_count}</td>
-                  <td className="px-5 py-3.5 text-right text-[#d0d0a0] font-medium hidden md:table-cell">
-                    {u.total_monthly > 0 ? `R$ ${u.total_monthly.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                  </td>
+                  <td className="px-5 py-3.5 text-right text-[#d0d0a0] font-medium hidden md:table-cell">{u.total_monthly > 0 ? `R$ ${u.total_monthly.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</td>
                   <td className="px-4 py-3.5 text-gray-600"><ChevronRight size={16} /></td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-600">Nenhum usuário encontrado.</td></tr>
-              )}
+              {filtered.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-600">Nenhum usuário encontrado.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -303,100 +323,65 @@ function Dashboard({ users, subscriptions, onSelectUser }: {
 
 // ── User Detail ───────────────────────────────────────────────────────────────
 
-function UserDetail({ user, subscriptions, onBack }: {
-  user: UserRow;
-  subscriptions: Subscription[];
-  onBack: () => void;
-}) {
+function UserDetail({ user, subscriptions, onBack }: { user: UserRow; subscriptions: Subscription[]; onBack: () => void }) {
   const [filter, setFilter] = useState<'all' | 'active' | 'cancelled'>('all');
   const [search, setSearch] = useState('');
 
   const userSubs = subscriptions.filter(s => s.user_id === user.id);
   const active = userSubs.filter(s => !s.status?.startsWith('cancelled'));
   const cancelled = userSubs.filter(s => s.status?.startsWith('cancelled'));
-
   const displayed = userSubs
     .filter(s => filter === 'all' ? true : filter === 'active' ? !s.status?.startsWith('cancelled') : s.status?.startsWith('cancelled'))
     .filter(s => s.name?.toLowerCase().includes(search.toLowerCase()) || s.category?.toLowerCase().includes(search.toLowerCase()));
 
   const totalMonthly = active.filter(s => s.costCurrency === 'BRL').reduce((acc, s) => acc + monthlyAmount(s), 0);
-
-  const categoryMap = active.filter(s => s.costCurrency === 'BRL').reduce((acc, s) => {
-    acc[s.category] = (acc[s.category] || 0) + monthlyAmount(s);
-    return acc;
-  }, {} as Record<string, number>);
+  const categoryMap = active.filter(s => s.costCurrency === 'BRL').reduce((acc, s) => { acc[s.category] = (acc[s.category] || 0) + monthlyAmount(s); return acc; }, {} as Record<string, number>);
 
   const exportCSV = () => {
     const rows = [
-      ['Nome', 'Categoria', 'Status', 'Custo', 'Moeda', 'Ciclo', 'Vencimento', 'Pagamento', 'Criado'],
-      ...userSubs.map(s => [s.name, s.category, s.status, String(s.costAmount), s.costCurrency, s.billingCycle, String(s.dueDate), s.paymentMethod || '', s.createdAt || ''])
+      ['Nome', 'Categoria', 'Status', 'Custo', 'Moeda', 'Ciclo', 'Vencimento', 'Pagamento'],
+      ...userSubs.map(s => [s.name, s.category, s.status, String(s.costAmount), s.costCurrency, s.billingCycle, String(s.dueDate), s.paymentMethod || ''])
     ];
     const csv = rows.map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `user-${user.id.slice(0, 8)}.csv`;
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `user-${user.id.slice(0, 8)}.csv` });
     a.click();
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <button onClick={onBack} className="w-9 h-9 rounded-xl bg-[#1a1a1a] border border-gray-800 flex items-center justify-center hover:border-gray-600 transition-colors shrink-0">
-          <ArrowLeft size={16} />
-        </button>
+        <button onClick={onBack} className="w-9 h-9 rounded-xl bg-[#1a1a1a] border border-gray-800 flex items-center justify-center hover:border-gray-600 transition-colors shrink-0"><ArrowLeft size={16} /></button>
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-12 h-12 rounded-2xl bg-[#d0d0a0]/20 border border-[#d0d0a0]/30 flex items-center justify-center text-lg font-black text-[#d0d0a0] shrink-0">
-            {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <h2 className="font-bold text-lg text-white truncate">{user.name || 'Sem nome'}</h2>
-            <p className="text-gray-500 text-sm truncate">{user.email}</p>
-          </div>
+          <div className="w-12 h-12 rounded-2xl bg-[#d0d0a0]/20 border border-[#d0d0a0]/30 flex items-center justify-center text-lg font-black text-[#d0d0a0] shrink-0">{(user.name || user.email || 'U').charAt(0).toUpperCase()}</div>
+          <div className="min-w-0"><h2 className="font-bold text-lg text-white truncate">{user.name || 'Sem nome'}</h2><p className="text-gray-500 text-sm truncate">{user.email}</p></div>
         </div>
-        <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-gray-700 rounded-xl text-xs text-gray-400 hover:text-white transition-colors shrink-0">
-          <Download size={13} /> CSV
-        </button>
+        <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-gray-700 rounded-xl text-xs text-gray-400 hover:text-white transition-colors shrink-0"><Download size={13} /> CSV</button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-[#111] border border-gray-800 rounded-xl p-4 text-center">
-          <div className="text-xs text-gray-500 mb-1">Total itens</div>
-          <div className="text-2xl font-bold">{userSubs.length}</div>
-        </div>
-        <div className="bg-[#111] border border-gray-800 rounded-xl p-4 text-center">
-          <div className="text-xs text-gray-500 mb-1">Ativos</div>
-          <div className="text-2xl font-bold text-emerald-400">{active.length}</div>
-        </div>
-        <div className="bg-[#111] border border-gray-800 rounded-xl p-4 text-center">
-          <div className="text-xs text-gray-500 mb-1">Gasto/mês</div>
-          <div className="text-base font-bold text-[#d0d0a0]">R$ {totalMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        </div>
-        <div className="bg-[#111] border border-gray-800 rounded-xl p-4 text-center">
-          <div className="text-xs text-gray-500 mb-1">Gasto/ano</div>
-          <div className="text-base font-bold text-[#d0d0a0]">R$ {(totalMonthly * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        </div>
+        {[{ label: 'Total', value: String(userSubs.length), color: '' }, { label: 'Ativos', value: String(active.length), color: 'text-emerald-400' }, { label: 'Gasto/mês', value: `R$ ${totalMonthly.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-[#d0d0a0]' }, { label: 'Gasto/ano', value: `R$ ${(totalMonthly * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-[#d0d0a0]' }].map(s => (
+          <div key={s.label} className="bg-[#111] border border-gray-800 rounded-xl p-4 text-center">
+            <div className="text-xs text-gray-500 mb-1">{s.label}</div>
+            <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-2">
         {user.language && <span className="flex items-center gap-1.5 text-xs text-gray-400 bg-[#1a1a1a] border border-gray-800 rounded-lg px-3 py-1.5"><Globe size={12} /> {user.language.toUpperCase()}</span>}
         {user.base_currency && <span className="flex items-center gap-1.5 text-xs text-gray-400 bg-[#1a1a1a] border border-gray-800 rounded-lg px-3 py-1.5"><DollarSign size={12} /> {user.base_currency}</span>}
         {user.updated_at && <span className="flex items-center gap-1.5 text-xs text-gray-400 bg-[#1a1a1a] border border-gray-800 rounded-lg px-3 py-1.5"><Calendar size={12} /> {new Date(user.updated_at).toLocaleDateString('pt-BR')}</span>}
-        <span className="flex items-center gap-1.5 text-xs text-gray-400 bg-[#1a1a1a] border border-gray-800 rounded-lg px-3 py-1.5 font-mono">ID: {user.id.slice(0, 8)}…</span>
+        <span className="text-xs text-gray-600 bg-[#1a1a1a] border border-gray-800 rounded-lg px-3 py-1.5 font-mono">ID: {user.id.slice(0, 8)}…</span>
       </div>
 
       {Object.keys(categoryMap).length > 0 && (
         <div className="bg-[#111] border border-gray-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4 text-sm font-semibold">
-            <Tag size={14} className="text-[#d0d0a0]" /> Gastos por Categoria (BRL/mês)
-          </div>
+          <div className="flex items-center gap-2 mb-4 text-sm font-semibold"><Tag size={14} className="text-[#d0d0a0]" /> Gastos por Categoria</div>
           <div className="space-y-2">
             {Object.entries(categoryMap).sort((a, b) => b[1] - a[1]).map(([cat, val]) => (
               <div key={cat} className="flex items-center gap-3">
                 <span className="text-xs text-gray-400 w-28 truncate">{cat}</span>
-                <div className="flex-1 bg-gray-800 rounded-full h-1.5">
-                  <div className="bg-[#d0d0a0] h-1.5 rounded-full" style={{ width: `${totalMonthly > 0 ? (val / totalMonthly) * 100 : 0}%` }} />
-                </div>
+                <div className="flex-1 bg-gray-800 rounded-full h-1.5"><div className="bg-[#d0d0a0] h-1.5 rounded-full" style={{ width: `${totalMonthly > 0 ? (val / totalMonthly) * 100 : 0}%` }} /></div>
                 <span className="text-xs text-gray-300 w-24 text-right">{fmt(val, 'BRL')}</span>
               </div>
             ))}
@@ -418,7 +403,6 @@ function UserDetail({ user, subscriptions, onBack }: {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." className="bg-[#1a1a1a] border border-gray-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none w-36" />
           </div>
         </div>
-
         <div className="divide-y divide-gray-800/40">
           {displayed.map(sub => (
             <div key={sub.id} className="px-5 py-4">
@@ -428,11 +412,7 @@ function UserDetail({ user, subscriptions, onBack }: {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-white text-sm">{sub.name}</span>
-                      {sub.status?.startsWith('cancelled') && (
-                        <span className="text-[10px] text-orange-400 border border-orange-800 rounded px-1.5 py-0.5 bg-orange-900/20">
-                          {sub.status === 'cancelled_temporary' ? 'Pausado' : 'Cancelado'}
-                        </span>
-                      )}
+                      {sub.status?.startsWith('cancelled') && <span className="text-[10px] text-orange-400 border border-orange-800 rounded px-1.5 py-0.5 bg-orange-900/20">{sub.status === 'cancelled_temporary' ? 'Pausado' : 'Cancelado'}</span>}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       <span className="text-xs text-gray-500 flex items-center gap-1"><Tag size={10} /> {sub.category}</span>
@@ -461,14 +441,10 @@ function AccessDenied({ email, onLogout }: { email: string; onLogout: () => void
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6">
       <div className="bg-[#111] border border-red-900/40 rounded-3xl p-8 max-w-sm w-full text-center space-y-4">
-        <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
-          <Shield size={28} className="text-red-400" />
-        </div>
+        <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto"><Shield size={28} className="text-red-400" /></div>
         <h2 className="text-lg font-bold text-red-400">Acesso Negado</h2>
         <p className="text-gray-400 text-sm">A conta <span className="font-mono text-gray-300">{email}</span> não tem permissão de admin.</p>
-        <button onClick={onLogout} className="w-full py-3 bg-gray-800 rounded-xl text-sm font-medium hover:bg-gray-700 transition-colors flex items-center justify-center gap-2">
-          <LogOut size={16} /> Sair e trocar conta
-        </button>
+        <button onClick={onLogout} className="w-full py-3 bg-gray-800 rounded-xl text-sm font-medium hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"><LogOut size={16} /> Sair</button>
       </div>
     </div>
   );
@@ -482,11 +458,11 @@ export default function App() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState('');
 
-  // Auth listener
+  // Auth state listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -499,30 +475,34 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Handle OAuth deep link on Android (io.constrictor.app://auth?code=...)
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listener = CapApp.addListener('appUrlOpen', async (event) => {
+      if (event.url.startsWith(DEEP_LINK)) {
+        await supabase.auth.exchangeCodeForSession(event.url);
+      }
+    });
+    return () => { listener.then(l => l.remove()); };
+  }, []);
+
   const fetchData = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    setDataLoading(true);
     setError('');
     try {
-      const { data: subs, error: subsErr } = await supabase
-        .from('subscriptions').select('*').order('createdAt', { ascending: false });
+      const { data: subs, error: subsErr } = await supabase.from('subscriptions').select('*').order('createdAt', { ascending: false });
       if (subsErr) throw new Error(subsErr.message);
       setSubscriptions((subs as Subscription[]) || []);
 
-      const { data: usersData, error: usersErr } = await supabase
-        .from('users').select('*').order('updated_at', { ascending: false });
-
+      const { data: usersData, error: usersErr } = await supabase.from('users').select('*').order('updated_at', { ascending: false });
       if (!usersErr && usersData && usersData.length > 0) {
         setUsers(usersData as UserRow[]);
       } else {
-        // Derive from subscriptions if users table is empty/missing
         const userMap = new Map<string, UserRow>();
-        ((subs as any[]) || []).forEach(s => {
+        ((subs as any[]) || []).forEach((s: any) => {
           if (s.user_id && !userMap.has(s.user_id)) {
-            userMap.set(s.user_id, {
-              id: s.user_id, email: '', name: '',
-              language: '', base_currency: '', updated_at: s.updatedAt || '',
-            });
+            userMap.set(s.user_id, { id: s.user_id, email: '', name: '', language: '', base_currency: '', updated_at: s.updatedAt || '' });
           }
         });
         setUsers(Array.from(userMap.values()));
@@ -531,7 +511,7 @@ export default function App() {
     } catch (e: any) {
       setError(e.message);
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   }, [user]);
 
@@ -539,25 +519,15 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setUsers([]);
-    setSubscriptions([]);
-    setSelectedUser(null);
+    setUsers([]); setSubscriptions([]); setSelectedUser(null);
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-2 border-gray-700 border-t-[#d0d0a0] animate-spin" />
-      </div>
-    );
+    return <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center"><div className="w-10 h-10 rounded-full border-2 border-gray-700 border-t-[#d0d0a0] animate-spin" /></div>;
   }
 
-  if (!user) return <LoginScreen onLogin={() => {}} />;
-
-  const userEmail = user.email || '';
-  if (userEmail !== ADMIN_EMAIL) {
-    return <AccessDenied email={userEmail} onLogout={handleLogout} />;
-  }
+  if (!user) return <LoginScreen />;
+  if (user.email !== ADMIN_EMAIL) return <AccessDenied email={user.email || ''} onLogout={handleLogout} />;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
@@ -565,23 +535,18 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-[#d0d0a0] rounded-xl flex items-center justify-center">
-              <span className="text-[#0a0a0a] font-black text-lg">C</span>
+              <SnakeLogo size={26} />
             </div>
             <div>
               <span className="font-bold text-sm text-white">Constrictor</span>
               <span className="ml-2 text-[10px] text-gray-600 bg-gray-800 px-2 py-0.5 rounded-full">admin</span>
             </div>
           </div>
-
           <div className="flex items-center gap-3">
-            {lastRefresh && (
-              <span className="text-xs text-gray-600 hidden sm:block">
-                {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-            {error && <span className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={12} /> {error}</span>}
-            <button onClick={fetchData} disabled={loading} className="w-9 h-9 rounded-xl bg-[#1a1a1a] border border-gray-800 flex items-center justify-center hover:border-gray-600 transition-colors disabled:opacity-50">
-              <RefreshCw size={15} className={loading ? 'animate-spin text-[#d0d0a0]' : 'text-gray-400'} />
+            {lastRefresh && <span className="text-xs text-gray-600 hidden sm:block">{lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
+            {error && <span className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={12} /> Erro</span>}
+            <button onClick={fetchData} disabled={dataLoading} className="w-9 h-9 rounded-xl bg-[#1a1a1a] border border-gray-800 flex items-center justify-center hover:border-gray-600 transition-colors disabled:opacity-50">
+              <RefreshCw size={15} className={dataLoading ? 'animate-spin text-[#d0d0a0]' : 'text-gray-400'} />
             </button>
             <button onClick={handleLogout} className="w-9 h-9 rounded-xl bg-[#1a1a1a] border border-gray-800 flex items-center justify-center hover:border-red-900 hover:text-red-400 transition-colors text-gray-500">
               <LogOut size={15} />
@@ -591,7 +556,7 @@ export default function App() {
       </header>
 
       <main className="max-w-6xl mx-auto px-5 py-8">
-        {loading && !users.length ? (
+        {dataLoading && !users.length ? (
           <div className="flex flex-col items-center justify-center py-32 gap-4">
             <div className="w-10 h-10 rounded-full border-2 border-gray-700 border-t-[#d0d0a0] animate-spin" />
             <p className="text-gray-500 text-sm">Carregando dados...</p>
