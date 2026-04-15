@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient, User } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 import {
   Users, Package, DollarSign, TrendingUp, Search, ChevronRight,
   ArrowLeft, RefreshCw, LogOut, Shield, AlertCircle,
@@ -11,6 +13,9 @@ import {
 const SUPABASE_URL = 'https://xrnfgdyqkqqpxjwpmkta.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_kX5vf6Ocj3b7PljEywobMg_UL_MECHd';
 const ADMIN_EMAIL = 'kauanfarias272@gmail.com';
+const REDIRECT = Capacitor.isNativePlatform()
+  ? 'io.constrictor.app://auth'
+  : window.location.origin;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -108,19 +113,19 @@ function LoginScreen() {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
-  const sendCode = async () => {
+  const sendLink = async () => {
     setLoading(true);
     setError('');
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: { shouldCreateUser: false },
+        options: { emailRedirectTo: REDIRECT, shouldCreateUser: true },
       });
       if (error) throw error;
-      setInfo(`Código enviado para ${email.trim()}. Verifique seu email.`);
+      setInfo(`Link enviado para ${email.trim()}. Abra o email e toque no botão de login — o app abrirá automaticamente.`);
       setStep('code');
     } catch (e: any) {
-      setError(e.message.includes('Signups not allowed') ? 'Email não cadastrado no sistema.' : e.message);
+      setError(e.message);
     } finally {
       setLoading(false);
     }
@@ -157,7 +162,7 @@ function LoginScreen() {
         <div className="bg-[#111] border border-gray-800 rounded-3xl p-8 space-y-5">
           <div className="flex items-center gap-2 text-[#d0d0a0]">
             <Shield size={18} />
-            <span className="text-sm font-semibold">{step === 'email' ? 'Acesso Restrito' : 'Verificar código'}</span>
+            <span className="text-sm font-semibold">{step === 'email' ? 'Acesso Restrito' : 'Verifique seu email'}</span>
           </div>
 
           {step === 'email' ? (
@@ -171,13 +176,13 @@ function LoginScreen() {
                   type="email"
                   className="w-full bg-[#1a1a1a] border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#d0d0a0]/50"
                   placeholder="seu@email.com"
-                  onKeyDown={e => e.key === 'Enter' && sendCode()}
+                  onKeyDown={e => e.key === 'Enter' && sendLink()}
                 />
               </div>
               {error && <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/20 border border-red-900/40 rounded-xl px-4 py-3"><AlertCircle size={16} className="shrink-0" />{error}</div>}
-              <button onClick={sendCode} disabled={loading} className="w-full py-3.5 bg-[#d0d0a0] text-[#0a0a0a] font-bold rounded-xl hover:bg-[#e0e0b0] transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
+              <button onClick={sendLink} disabled={loading} className="w-full py-3.5 bg-[#d0d0a0] text-[#0a0a0a] font-bold rounded-xl hover:bg-[#e0e0b0] transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
                 {loading ? <div className="w-4 h-4 rounded-full border-2 border-[#0a0a0a]/30 border-t-[#0a0a0a] animate-spin" /> : null}
-                {loading ? 'Enviando...' : 'Enviar código'}
+                {loading ? 'Enviando...' : 'Enviar link de acesso'}
               </button>
             </>
           ) : (
@@ -495,6 +500,17 @@ export default function App() {
       setAuthLoading(false);
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Deep link handler: magic link opens io.constrictor.app://auth?code=…
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listener = CapApp.addListener('appUrlOpen', async (event) => {
+      if (event.url.startsWith('io.constrictor.app://auth')) {
+        await supabase.auth.exchangeCodeForSession(event.url);
+      }
+    });
+    return () => { listener.then(l => l.remove()); };
   }, []);
 
 
